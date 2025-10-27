@@ -75,7 +75,8 @@ export default defineConfig({
   server: {
     host: '0.0.0.0',
     port: 5000,
-    strictPort: true
+    strictPort: true,
+    allowedHosts: ['3f2a36e5-a58a-4c8d-bf98-804e5a41e69b-00-3qzrshaq8penp.janeway.replit.dev']
   },
   build: {
     rollupOptions: {

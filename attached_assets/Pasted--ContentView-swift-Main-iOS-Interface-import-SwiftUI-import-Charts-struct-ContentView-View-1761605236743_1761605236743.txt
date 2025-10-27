@@ -1,0 +1,365 @@
+// ContentView.swift - Main iOS Interface
+import SwiftUI
+import Charts
+
+struct ContentView: View {
+    @StateObject private var monitorManager = MonitorManager()
+    @State private var selectedTab = 0
+    
+    var body: some View {
+        TabView(selection: $selectedTab) {
+            ORLiveView()
+                .tabItem {
+                    Image(systemName: "waveform.path.ecg")
+                    Text("OR Live")
+                }
+                .tag(0)
+            
+            SimulatorView()
+                .tabItem {
+                    Image(systemName: "play.circle")
+                    Text("Simulator")
+                }
+                .tag(1)
+            
+            ResearchView()
+                .tabItem {
+                    Image(systemName: "square.and.arrow.up")
+                    Text("Research")
+                }
+                .tag(2)
+            
+            ChecklistView()
+                .tabItem {
+                    Image(systemName: "checklist")
+                    Text("Safety Check")
+                }
+                .tag(3)
+        }
+        .accentColor(.blue)
+    }
+}
+
+// MARK: - OR Live Dashboard
+struct ORLiveView: View {
+    @StateObject private var viewModel = ORLiveViewModel()
+    
+    var body: some View {
+        NavigationView {
+            ScrollView {
+                VStack(spacing: 16) {
+                    // Risk Score Card
+                    RiskScoreCard(orsResult: viewModel.orsResult)
+                    
+                    // Waveform Display
+                    WaveformView(physioData: viewModel.physioData)
+                    
+                    // Component Scores
+                    ComponentScoresView(scores: viewModel.orsResult?.componentScores ?? [:])
+                    
+                    // Conflict Alerts
+                    ConflictAlertsView(conflicts: viewModel.orsResult?.conflicts ?? [])
+                    
+                    // Intervention Timer
+                    InterventionTimerView(
+                        microflowTime: viewModel.microflowStagnationTime,
+                        isCritical: viewModel.isMicroflowCritical
+                    )
+                }
+                .padding()
+            }
+            .navigationTitle("NeuroSight Monitor")
+            .refreshable {
+                await viewModel.refreshData()
+            }
+        }
+    }
+}
+
+struct RiskScoreCard: View {
+    let orsResult: ORSResult?
+    
+    var riskColor: Color {
+        guard let result = orsResult else { return .gray }
+        switch result.riskLevel {
+        case "LOW": return .green
+        case "MODERATE": return .yellow
+        case "HIGH": return .red
+        default: return .gray
+        }
+    }
+    
+    var body: some View {
+        VStack {
+            HStack {
+                VStack(alignment: .leading) {
+                    Text("Optic Risk Score")
+                        .font(.headline)
+                    Text(orsResult?.riskLevel ?? "CALCULATING")
+                        .font(.subheadline)
+                        .foregroundColor(riskColor)
+                }
+                
+                Spacer()
+                
+                ZStack {
+                    Circle()
+                        .stroke(riskColor.opacity(0.3), lineWidth: 10)
+                    
+                    Circle()
+                        .trim(from: 0, to: CGFloat((orsResult?.orsScore ?? 0) / 100))
+                        .stroke(riskColor, style: StrokeStyle(lineWidth: 10, lineCap: .round))
+                        .rotationEffect(.degrees(-90))
+                    
+                    Text("\(Int(orsResult?.orsScore ?? 0))")
+                        .font(.system(size: 32, weight: .bold))
+                }
+                .frame(width: 100, height: 100)
+            }
+            
+            if orsResult?.alert == true {
+                HStack {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                    Text("CRITICAL ALERT - Intervention Required")
+                    Spacer()
+                }
+                .foregroundColor(.red)
+                .padding()
+                .background(Color.red.opacity(0.1))
+                .cornerRadius(8)
+            }
+        }
+        .padding()
+        .background(Color(.systemBackground))
+        .cornerRadius(12)
+        .shadow(radius: 2)
+    }
+}
+
+struct WaveformView: View {
+    let physioData: PhysioData
+    
+    var body: some View {
+        VStack(alignment: .leading) {
+            Text("Real-time Waveforms")
+                .font(.headline)
+            
+            TabView {
+                VStack {
+                    Text("PLET Variation: \(Int(physioData.pletVariation))%")
+                    Chart(physioData.pletWaveform, id: \.x) { point in
+                        LineMark(
+                            x: .value("Time", point.x),
+                            y: .value("Amplitude", point.y)
+                        )
+                    }
+                    .frame(height: 120)
+                }
+                
+                VStack {
+                    Text("Microvascular Flow: \(Int(physioData.microvascularFlow)) mm/s")
+                    Chart(physioData.flowWaveform, id: \.x) { point in
+                        LineMark(
+                            x: .value("Time", point.x),
+                            y: .value("Flow", point.y)
+                        )
+                    }
+                    .frame(height: 120)
+                }
+            }
+            .tabViewStyle(PageTabViewStyle())
+            .frame(height: 180)
+        }
+        .padding()
+        .background(Color(.systemBackground))
+        .cornerRadius(12)
+        .shadow(radius: 2)
+    }
+}
+
+// MARK: - Simulator View
+struct SimulatorView: View {
+    @StateObject private var simulator = POVLSimulator()
+    @State private var currentCase: SimulatorCase?
+    
+    var body: some View {
+        NavigationView {
+            ScrollView {
+                if let currentCase = currentCase {
+                    SimulatorCaseView(case: currentCase, simulator: simulator)
+                } else {
+                    CaseSelectionView(simulator: simulator, currentCase: $currentCase)
+                }
+            }
+            .navigationTitle("POVL Simulator")
+        }
+    }
+}
+
+struct SimulatorCaseView: View {
+    let `case`: SimulatorCase
+    @ObservedObject var simulator: POVLSimulator
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text(`case`.title)
+                .font(.title2)
+                .bold()
+            
+            Text(`case`.description)
+                .font(.body)
+            
+            // Simulated monitor display
+            RiskScoreCard(orsResult: simulator.currentORS)
+            
+            // Intervention options
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())]) {
+                ForEach(`case`.possibleInterventions, id: \.self) { intervention in
+                    Button(intervention) {
+                        simulator.applyIntervention(intervention)
+                    }
+                    .buttonStyle(InterventionButtonStyle())
+                }
+            }
+            
+            // Timer and score
+            HStack {
+                VStack {
+                    Text("Time Elapsed")
+                    Text("\(simulator.elapsedTime)s")
+                        .font(.title2)
+                }
+                
+                Spacer()
+                
+                VStack {
+                    Text("Performance Score")
+                    Text("\(simulator.performanceScore)")
+                        .font(.title2)
+                }
+            }
+            .padding()
+        }
+        .padding()
+    }
+}
+
+// MARK: - Data Models
+struct ORSResult: Codable {
+    let orsScore: Double
+    let riskLevel: String
+    let alert: Bool
+    let componentScores: [String: Double]
+    let cmro2Do2Ratio: Double
+    let conflicts: [Conflict]
+    let timestamp: String
+}
+
+struct Conflict: Codable {
+    let type: String
+    let message: String
+    let severity: String
+    let suggestions: [String]
+}
+
+struct PhysioData {
+    let pletVariation: Double
+    let microvascularFlow: Double
+    let pletWaveform: [WaveformPoint]
+    let flowWaveform: [WaveformPoint]
+}
+
+struct WaveformPoint {
+    let x: Double
+    let y: Double
+}
+
+// MARK: - View Models
+class ORLiveViewModel: ObservableObject {
+    @Published var orsResult: ORSResult?
+    @Published var physioData = PhysioData(
+        pletVariation: 15.0,
+        microvascularFlow: 25.0,
+        pletWaveform: generateWaveform(),
+        flowWaveform: generateWaveform()
+    )
+    @Published var microflowStagnationTime: TimeInterval = 0
+    @Published var isMicroflowCritical = false
+    
+    private let apiService = APIService()
+    
+    @MainActor
+    func refreshData() async {
+        do {
+            let newData = try await apiService.fetchORSData()
+            self.orsResult = newData
+            updateCriticalTimers(with: newData)
+        } catch {
+            print("Error fetching data: \(error)")
+        }
+    }
+    
+    private func updateCriticalTimers(with result: ORSResult?) {
+        guard let result = result else { return }
+        
+        if result.componentScores["microvascular_flow"] ?? 0 > 70 {
+            microflowStagnationTime += 30 // Simulate 30s update
+            isMicroflowCritical = microflowStagnationTime > 180 // 3 minutes
+        } else {
+            microflowStagnationTime = 0
+            isMicroflowCritical = false
+        }
+    }
+}
+
+class APIService: ObservableObject {
+    private let baseURL = "http://localhost:5000/api"
+    
+    func fetchORSData() async throws -> ORSResult {
+        let url = URL(string: "\(baseURL)/calculate-ors")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        // Mock physiological data - in real app, this comes from Bluetooth monitors
+        let requestData: [String: Any] = [
+            "plet_variation": Double.random(in: 10...35),
+            "microvascular_flow": Double.random(in: 10...30),
+            "optic_nerve_diameter": Double.random(in: 4.0...6.0),
+            "bis_index": Double.random(in: 40...80),
+            "spo2": Double.random(in: 92...99),
+            "map_bp": Double.random(in: 50...90),
+            "hb": Double.random(in: 7.0...12.0),
+            "temperature": Double.random(in: 35.5...37.5),
+            "emboli_count": Int.random(in: 0...15)
+        ]
+        
+        request.httpBody = try JSONSerialization.data(withJSONObject: requestData)
+        
+        let (data, _) = try await URLSession.shared.data(for: request)
+        return try JSONDecoder().decode(ORSResult.self, from: data)
+    }
+}
+
+// MARK: - Helper Functions
+private static func generateWaveform() -> [WaveformPoint] {
+    var points: [WaveformPoint] = []
+    for i in 0..<50 {
+        points.append(WaveformPoint(
+            x: Double(i),
+            y: Double.random(in: 0...100)
+        ))
+    }
+    return points
+}
+
+// Additional views for ComponentScoresView, ConflictAlertsView, InterventionTimerView, etc.
+// would be implemented here following the same pattern...
+
+struct NeuroSightApp: App {
+    var body: some Scene {
+        WindowGroup {
+            ContentView()
+        }
+    }
+}
