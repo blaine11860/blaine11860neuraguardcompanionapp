@@ -9,9 +9,9 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['icon-180.png', 'icon-192.png', 'icon-512.png'],
       manifest: {
-        name: 'ORS Monitor - Optic Risk Score',
-        short_name: 'ORS Monitor',
-        description: 'Real-time surgical monitoring system for optic nerve ischemia risk',
+        name: 'NeuraGuard Companion App',
+        short_name: 'NeuraGuard',
+        description: 'Real-time neuro-monitoring for anesthesiologists - ORS and NS-Coupling Index',
         theme_color: '#1e40af',
         background_color: '#ffffff',
         display: 'standalone',

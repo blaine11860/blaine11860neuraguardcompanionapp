@@ -1,23 +1,23 @@
 # Progressive Web App (PWA) Installation Guide
 
 ## Overview
-The ORS Monitor is now a Progressive Web App that can be installed on iOS devices like a native app. It works offline, has a native app icon, and provides a full-screen experience.
+NeuraGuard Companion App is a Progressive Web App that can be installed on iOS devices like a native app. It works offline, has a native app icon, and provides a full-screen experience for real-time neuro-monitoring.
 
 ## Installing on iOS (iPhone/iPad)
 
 ### Step 1: Open in Safari
 1. Open Safari browser on your iOS device
-2. Navigate to your ORS Monitor URL
+2. Navigate to your NeuraGuard app URL
 3. Wait for the page to fully load
 
 ### Step 2: Add to Home Screen
 1. Tap the **Share** button (square with arrow pointing up) at the bottom of Safari
 2. Scroll down and tap **"Add to Home Screen"**
-3. You'll see the ORS Monitor icon and name
+3. You'll see the NeuraGuard icon and name
 4. Tap **"Add"** in the top right corner
 
 ### Step 3: Launch the App
-1. Find the ORS Monitor icon on your home screen
+1. Find the NeuraGuard icon on your home screen
 2. Tap to launch
 3. The app will open in full-screen mode without Safari UI
 4. Works offline for cached content
@@ -26,7 +26,7 @@ The ORS Monitor is now a Progressive Web App that can be installed on iOS device
 
 ### Chrome Installation
 1. Open Chrome browser
-2. Navigate to the ORS Monitor URL
+2. Navigate to the NeuraGuard app URL
 3. Chrome will automatically show an "Install" prompt at the bottom
 4. Tap **"Install"**
 5. The app icon will appear on your home screen
@@ -40,7 +40,7 @@ The ORS Monitor is now a Progressive Web App that can be installed on iOS device
 ## Installing on Desktop
 
 ### Chrome/Edge
-1. Open the ORS Monitor in Chrome or Edge
+1. Open NeuraGuard in Chrome or Edge
 2. Look for the install icon (⊕ or computer icon) in the address bar
 3. Click the icon
 4. Click **"Install"**
@@ -49,7 +49,7 @@ The ORS Monitor is now a Progressive Web App that can be installed on iOS device
 ### Manual Installation
 1. Open the app
 2. Click the **three-dot menu**
-3. Select **"Install ORS Monitor"** or **"Add to Desktop"**
+3. Select **"Install NeuraGuard"** or **"Add to Desktop"**
 4. Confirm installation
 
 ## PWA Features

@@ -11,9 +11,9 @@ function App() {
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-2">
                 <div className="w-8 h-8 sm:w-10 sm:h-10 bg-blue-500 rounded-full flex items-center justify-center flex-shrink-0">
-                  <span className="text-lg sm:text-xl font-bold">ORS</span>
+                  <span className="text-lg sm:text-xl font-bold">NG</span>
                 </div>
-                <h1 className="text-lg sm:text-2xl font-bold truncate">ORS Monitor</h1>
+                <h1 className="text-lg sm:text-2xl font-bold truncate">NeuraGuard</h1>
               </div>
               <div className="flex space-x-3 sm:space-x-6">
                 <Link to="/" className="hover:text-blue-300 transition-colors font-medium text-sm sm:text-base">

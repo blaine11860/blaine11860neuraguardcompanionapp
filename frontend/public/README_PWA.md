@@ -1,4 +1,4 @@
-# PWA Status - ORS Monitor
+# PWA Status - NeuraGuard Companion App
 
 ## Current Implementation
 

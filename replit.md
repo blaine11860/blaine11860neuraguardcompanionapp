@@ -1,17 +1,21 @@
-# Optic Risk Score (ORS) Monitor
+# NeuraGuard Companion App
 
 ## Overview
-Real-time surgical monitoring application that calculates and displays Optic Risk Score (ORS) for preventing perioperative visual loss (POVL) during prone position surgeries. This medical-grade monitoring system processes 9 physiological parameters to provide risk assessment and clinical decision support.
+Comprehensive neuro-monitoring companion application for anesthesiologists, combining Optic Risk Score (ORS) monitoring and NS-Coupling Index (NS-CI) analysis. This medical-grade system processes 9 physiological parameters plus neurovascular coupling dynamics to prevent perioperative neurological complications.
 
 ## Purpose
-Assists anesthesiologists and surgical teams in monitoring optic nerve ischemia risk during prone spine surgeries and other procedures where POVL is a concern. The system provides real-time risk scoring, conflict detection, and actionable clinical suggestions.
+Assists anesthesiologists and surgical teams in real-time monitoring of:
+- **Optic nerve ischemia risk** during prone position surgeries via Optic Risk Score (ORS)
+- **Neurovascular coupling dynamics** via NS-Coupling Index (NS-CI) from cerebral blood flow and CO₂
+- Provides real-time risk scoring, conflict detection, and actionable clinical interventions
 
 ## Current State
 **Offline-First Progressive Web App (PWA)** - Production ready with full offline capability:
-- Real-time ORS calculation engine with all 9 parameters
-- Interactive monitoring dashboard
+- Real-time ORS calculation engine with all 9 physiological parameters
+- NS-Coupling Index analyzer with hypercapnic calibration support
+- Interactive monitoring dashboard with real-time waveforms
 - Component score breakdown visualization
-- Automated conflict detection
+- Automated conflict detection and clinical alerts
 - Research collaboration portal
 - Medical-grade accuracy with weights summing to exactly 1.0
 - PWA installable on iOS/Android/Desktop (add to home screen)
@@ -19,6 +23,7 @@ Assists anesthesiologists and surgical teams in monitoring optic nerve ischemia 
 - **Full offline-first support with Workbox** - works completely offline after first visit
 - Automatic service worker updates with user prompts
 - All routes work offline (SPA navigation fallback)
+- Scientific computing backend (NumPy, SciPy, Plotly, Pandas, Matplotlib)
 
 ## Recent Changes
 **October 27, 2025 - Workbox Integration**
@@ -69,8 +74,9 @@ Assists anesthesiologists and surgical teams in monitoring optic nerve ischemia 
   - ConflictAlerts: Clinical conflict detection with actionable suggestions
 
 ### Technology Stack
-- **Backend**: Python 3.11, Flask, Flask-CORS, NumPy, Pandas
+- **Backend**: Python 3.11, Flask, Flask-CORS, NumPy, SciPy, Pandas, Plotly, Matplotlib
 - **Frontend**: React 18, Vite 6, Tailwind CSS, Recharts, React Router
+- **PWA**: Workbox, vite-plugin-pwa, Service Workers
 - **Development**: Hot module reload, CORS enabled for local development
 
 ## Key Features
