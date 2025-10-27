@@ -2,50 +2,51 @@
 
 ## Current Implementation
 
-This app is a **Progressive Web App (PWA)** with the following features:
+This app is a **fully offline-first Progressive Web App (PWA)** powered by Workbox with the following features:
 
 ### ✅ Working Features
 - **Installable on iOS/Android/Desktop** - Add to home screen functionality
 - **App-like experience** - Runs in standalone mode without browser UI
 - **Custom app icon** - Professional medical icon on home screen
 - **iOS-optimized** - Proper safe areas, status bar, and touch icons
-- **Runtime caching** - Assets are cached after first load for faster subsequent visits
-- **Partial offline support** - App works offline after visiting once while online
-
-### ⚠️ Current Limitations
-- **First offline visit** - Requires initial online load to cache assets
-- **Not fully offline-first** - JavaScript bundles load from network on first visit
-- **Manual refresh needed** - Service worker updates require page refresh
+- **Full offline-first support** - All assets precached, works completely offline after first visit
+- **Automatic updates** - Service worker auto-updates with user confirmation
+- **Smart caching** - Runtime caching for fonts and API with appropriate strategies
+- **SPA navigation support** - All routes work offline with fallback to app shell
 
 ## How It Works
 
 ### Installation Flow
 1. User visits app online (first time)
-2. Service worker registers and caches HTML, manifest, and icons
-3. As user navigates, JS/CSS/images are cached dynamically
-4. User can add to home screen
-5. Subsequent visits work faster and can handle brief offline periods
+2. Workbox service worker registers and precaches ALL build assets:
+   - HTML shell (index.html)
+   - JavaScript bundles (vendor, charts, app code)
+   - CSS stylesheets
+   - Icons and manifest
+3. User can add to home screen immediately
+4. Subsequent visits work 100% offline
 
 ### Offline Behavior
-- **After first online visit**: App shell, JS, CSS cached → works offline
-- **Cold start offline**: Will show blank page (needs online first load)
-- **API calls**: Always require internet (shows error message when offline)
+- **After first online visit**: ✅ Completely functional offline
+- **All routes work**: Dashboard, Research pages load from cache
+- **SPA navigation**: React Router handles routing client-side
+- **API calls**: Network-first with 10s timeout, shows error when offline
+- **Updates**: Auto-detected and user prompted to reload
 
-## Upgrade Path for Full Offline Support
+## Workbox Implementation
 
-To achieve true offline-first behavior, implement:
+### Precaching (Build Time)
+All production assets are precached during build:
+- 13 entries totaling ~2.5 MB
+- JavaScript bundles (hashed for cache busting)
+- CSS files with proper versioning
+- App icons and manifest
+- HTML shell for all routes
 
-1. **Workbox** - Google's PWA tooling
-   ```js
-   import { injectManifest } from 'workbox-build';
-   ```
-
-2. **Build-time precaching** - Generate asset manifest during build
-   ```js
-   // vite.config.js with workbox plugin
-   ```
-
-3. **Update prompts** - Notify users when new version available
+### Runtime Caching Strategies
+1. **Google Fonts**: CacheFirst (1 year expiration)
+2. **API Calls**: NetworkFirst (10s timeout, 5min cache)
+3. **Navigation**: Fallback to index.html for SPA routing
 
 ## User Experience
 
@@ -69,18 +70,24 @@ To achieve true offline-first behavior, implement:
 
 ## Technical Details
 
-### Service Worker Strategy
+### Service Worker Strategy (Workbox)
 ```
-Static Cache: HTML, manifest, icons (precached on install)
-Runtime Cache: JS, CSS, images (cached on first fetch)
-Network-First: API calls (with offline fallback)
+Precache: ALL build assets (JS, CSS, HTML, icons, manifest)
+  - Generated at build time with revision hashes
+  - Automatically updated on new builds
+  
+Runtime Caching:
+  - Google Fonts: CacheFirst (max 10 entries, 1 year)
+  - API calls: NetworkFirst (10s timeout, 5min cache, max 50)
+  
+Navigation: index.html fallback for SPA routes (excluding /api)
 ```
 
 ### Cache Management
-- Static cache: `ors-monitor-v2`
-- Runtime cache: `ors-runtime-v2`
-- Old caches deleted on activation
-- Assets cached indefinitely (until version bump)
+- Automatic version management via Workbox
+- Old caches cleaned up on activation
+- skipWaiting + clientsClaim for immediate updates
+- User prompted before updating to new version
 
 ### Browser Support
 - ✅ iOS Safari 16+ (Add to Home Screen)
@@ -111,15 +118,27 @@ Network-First: API calls (with offline fallback)
 - [x] App installs to home screen
 - [x] Standalone mode works
 - [x] Safe areas respected on iOS
-- [ ] Fully works offline (cold start)
-- [x] Runtime assets cache properly
-- [ ] Update prompt implemented
+- [x] Fully works offline (cold start) ✨
+- [x] All build assets precached ✨
+- [x] Update prompt implemented ✨
+- [x] SPA navigation works offline ✨
 
-## Next Steps
+## Production Testing
 
-To upgrade to full PWA:
-1. Install @vite-plugin-pwa
-2. Configure workbox in vite.config.js
-3. Generate asset manifest at build time
-4. Implement update notifications
-5. Test offline-first behavior
+### Test Offline Functionality
+1. Build production version: `npm run build`
+2. Serve: `npx serve dist`
+3. Visit in browser
+4. Open DevTools → Application → Service Workers
+5. Verify "Activated and running"
+6. Enable "Offline" mode in DevTools
+7. Refresh page - should load instantly
+8. Navigate to /dashboard and /research - should work
+9. Try API call - should show error gracefully
+
+### Test Updates
+1. Make code change
+2. Build new version
+3. Reload page
+4. Should see "New content available. Reload to update?"
+5. Click OK - new version loads
