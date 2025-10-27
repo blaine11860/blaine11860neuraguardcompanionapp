@@ -7,13 +7,16 @@ Real-time surgical monitoring application that calculates and displays Optic Ris
 Assists anesthesiologists and surgical teams in monitoring optic nerve ischemia risk during prone spine surgeries and other procedures where POVL is a concern. The system provides real-time risk scoring, conflict detection, and actionable clinical suggestions.
 
 ## Current State
-**Production Ready MVP** - All core features implemented and tested:
+**Progressive Web App (PWA) with Mobile Support** - All core features implemented:
 - Real-time ORS calculation engine with all 9 parameters
 - Interactive monitoring dashboard
 - Component score breakdown visualization
 - Automated conflict detection
 - Research collaboration portal
 - Medical-grade accuracy with weights summing to exactly 1.0
+- PWA installable on iOS/Android/Desktop (add to home screen)
+- Mobile-optimized responsive design
+- Partial offline support (requires initial online load)
 
 ## Recent Changes
 **October 27, 2025**

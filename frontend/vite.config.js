@@ -7,5 +7,15 @@ export default defineConfig({
     host: '0.0.0.0',
     port: 5000,
     strictPort: true
+  },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom', 'react-router-dom'],
+          charts: ['recharts']
+        }
+      }
+    }
   }
 })
