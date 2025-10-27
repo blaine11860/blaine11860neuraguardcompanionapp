@@ -1,0 +1,349 @@
+# app.py - NS-CI Anesthesiologist Companion App
+import numpy as np
+import matplotlib.pyplot as plt
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+import pandas as pd
+from scipy import signal
+import time
+from datetime import datetime
+import json
+
+class NSCouplingAnalyzer:
+    """Real-time NS-Coupling Index Calculator"""
+    
+    def __init__(self):
+        # Physiological parameters
+        self.cbf_baseline = 50  # mL/100g/min
+        self.paco2_baseline = 40  # mmHg
+        self.alpha_0 = 0.38  # Grubb's constant (initial estimate)
+        self.vasopressor_effect = 0.0
+        
+        # Signal processing
+        self.sampling_rate = 1  # Hz
+        self.window_size = 60  # 60-second rolling window
+        self.data_buffer = {
+            'timestamp': [],
+            'cbf': [],
+            'paco2': [],
+            'nirs_signal': [],
+            'nsc_index': []
+        }
+        
+        # Hypercapnic calibration state
+        self.calibration_complete = False
+        self.hypercapnia_data = []
+        
+    def simulate_hypercapnic_calibration(self):
+        """Simulate 5% CO2 challenge for baseline alpha calculation"""
+        print("Starting hypercapnic calibration...")
+        
+        # Simulate baseline (2 minutes)
+        baseline_cbf = []
+        baseline_paco2 = []
+        
+        for i in range(120):
+            cbf = self.cbf_baseline + np.random.normal(0, 1)
+            paco2 = self.paco2_baseline + np.random.normal(0, 0.5)
+            baseline_cbf.append(cbf)
+            baseline_paco2.append(paco2)
+            
+        # Simulate hypercapnia (3 minutes of 5% CO2)
+        hypercapnia_cbf = []
+        hypercapnia_paco2 = []
+        
+        for i in range(180):
+            # CO2 increases to ~50 mmHg
+            paco2 = 50 + np.random.normal(0, 1)
+            # CBF increases with CO2 reactivity
+            cbf_reactivity = 0.05  # 5% increase per mmHg CO2
+            cbf = self.cbf_baseline * (1 + cbf_reactivity * (paco2 - self.paco2_baseline))
+            cbf += np.random.normal(0, 1.5)
+            
+            hypercapnia_cbf.append(cbf)
+            hypercapnia_paco2.append(paco2)
+            
+        # Calculate patient-specific alpha_0
+        cbf_ratio = np.mean(hypercapnia_cbf) / np.mean(baseline_cbf)
+        paco2_ratio = np.mean(hypercapnia_paco2) / np.mean(baseline_paco2)
+        
+        self.alpha_0 = np.log(cbf_ratio) / np.log(paco2_ratio)
+        self.calibration_complete = True
+        
+        print(f"Calibration complete: α₀ = {self.alpha_0:.3f}")
+        return self.alpha_0
+    
+    def generate_synthetic_physiology(self, duration_minutes=10):
+        """Generate synthetic CBF and PaCO2 data with various clinical scenarios"""
+        timestamps = np.arange(0, duration_minutes * 60, 1/self.sampling_rate)
+        
+        # Base signals
+        cbf_base = np.ones_like(timestamps) * self.cbf_baseline
+        paco2_base = np.ones_like(timestamps) * self.paco2_baseline
+        
+        # Add respiratory variations
+        respiratory_freq = 0.25  # 15 breaths/minute
+        cbf_variation = 2 * np.sin(2 * np.pi * respiratory_freq * timestamps)
+        paco2_variation = 1 * np.sin(2 * np.pi * respiratory_freq * timestamps)
+        
+        # Clinical scenarios
+        scenario_time = duration_minutes * 60 // 4
+        
+        # Scenario 1: Normal coupling (first quarter)
+        cbf_scenario1 = cbf_base[:scenario_time] + cbf_variation[:scenario_time]
+        paco2_scenario1 = paco2_base[:scenario_time] + paco2_variation[:scenario_time]
+        
+        # Scenario 2: Decoupling - ischemia (second quarter)
+        cbf_scenario2 = cbf_base[scenario_time:2*scenario_time] * 0.7  # Reduced CBF
+        paco2_scenario2 = paco2_base[scenario_time:2*scenario_time] + paco2_variation[scenario_time:2*scenario_time]
+        
+        # Scenario 3: Hyperemia (third quarter)
+        cbf_scenario3 = cbf_base[2*scenario_time:3*scenario_time] * 1.3  # Increased CBF
+        paco2_scenario3 = paco2_base[2*scenario_time:3*scenario_time] + paco2_variation[2*scenario_time:3*scenario_time]
+        
+        # Scenario 4: Normal with artifacts (fourth quarter)
+        cbf_scenario4 = cbf_base[3*scenario_time:] + cbf_variation[3*scenario_time:]
+        paco2_scenario4 = paco2_base[3*scenario_time:] + paco2_variation[3*scenario_time:]
+        
+        # Add random noise
+        cbf_full = np.concatenate([cbf_scenario1, cbf_scenario2, cbf_scenario3, cbf_scenario4])
+        paco2_full = np.concatenate([paco2_scenario1, paco2_scenario2, paco2_scenario3, paco2_scenario4])
+        
+        cbf_full += np.random.normal(0, 1, len(cbf_full))
+        paco2_full += np.random.normal(0, 0.3, len(paco2_full))
+        
+        return timestamps, cbf_full, paco2_full
+    
+    def calculate_ns_ci(self, cbf_current, paco2_current):
+        """Calculate NS-Coupling Index in real-time"""
+        if not self.calibration_complete:
+            return None
+            
+        # Avoid division by zero and log(0)
+        if (cbf_current <= 0 or paco2_current <= 0 or 
+            self.cbf_baseline <= 0 or self.paco2_baseline <= 0):
+            return None
+            
+        try:
+            # Core NS-CI formula
+            numerator = np.log(cbf_current / self.cbf_baseline)
+            denominator = np.log(paco2_current / self.paco2_baseline)
+            
+            if denominator == 0:
+                return None
+                
+            ns_ci = (numerator / denominator) * (1 / self.alpha_0)
+            
+            # Add vasopressor effect (simplified)
+            ns_ci += self.vasopressor_effect
+            
+            return ns_ci
+            
+        except (ValueError, ZeroDivisionError):
+            return None
+    
+    def run_simulation(self):
+        """Run complete NS-CI simulation"""
+        print("=== NS-Coupling Index Simulation ===")
+        
+        # Step 1: Hypercapnic calibration
+        alpha_calibrated = self.simulate_hypercapnic_calibration()
+        
+        # Step 2: Generate synthetic physiology data
+        timestamps, cbf_data, paco2_data = self.generate_synthetic_physiology()
+        
+        # Step 3: Calculate NS-CI in real-time
+        ns_ci_values = []
+        valid_indices = []
+        
+        for i, (cbf, paco2) in enumerate(zip(cbf_data, paco2_data)):
+            ns_ci = self.calculate_ns_ci(cbf, paco2)
+            if ns_ci is not None:
+                ns_ci_values.append(ns_ci)
+                valid_indices.append(i)
+                
+                # Store in data buffer (simulating real-time)
+                self.data_buffer['timestamp'].append(timestamps[i])
+                self.data_buffer['cbf'].append(cbf)
+                self.data_buffer['paco2'].append(paco2)
+                self.data_buffer['nsc_index'].append(ns_ci)
+        
+        # Step 4: Visualize results
+        self.visualize_results(timestamps, cbf_data, paco2_data, ns_ci_values, valid_indices)
+        
+        return ns_ci_values
+    
+    def visualize_results(self, timestamps, cbf_data, paco2_data, ns_ci_values, valid_indices):
+        """Create interactive visualization"""
+        fig = make_subplots(
+            rows=3, cols=1,
+            subplot_titles=('Cerebral Blood Flow (CBF)', 'Arterial CO₂ (PaCO₂)', 'NS-Coupling Index'),
+            vertical_spacing=0.08
+        )
+        
+        # Plot CBF
+        fig.add_trace(
+            go.Scatter(x=timestamps/60, y=cbf_data, mode='lines', 
+                      name='CBF', line=dict(color='blue')),
+            row=1, col=1
+        )
+        
+        # Plot PaCO2
+        fig.add_trace(
+            go.Scatter(x=timestamps/60, y=paco2_data, mode='lines',
+                      name='PaCO₂', line=dict(color='green')),
+            row=2, col=1
+        )
+        
+        # Plot NS-CI
+        valid_timestamps = [timestamps[i]/60 for i in valid_indices]
+        fig.add_trace(
+            go.Scatter(x=valid_timestamps, y=ns_ci_values, mode='lines+markers',
+                      name='NS-CI', line=dict(color='red')),
+            row=3, col=1
+        )
+        
+        # Add coupling status regions
+        fig.add_hrect(y0=0.5, y1=1.5, line_width=0, fillcolor="green", opacity=0.2, row=3, col=1)
+        fig.add_hrect(y0=0, y0ref="y3", y1=0.5, line_width=0, fillcolor="red", opacity=0.2, row=3, col=1)
+        fig.add_hrect(y0=1.5, y1=3, line_width=0, fillcolor="orange", opacity=0.2, row=3, col=1)
+        
+        # Add annotations
+        fig.add_annotation(x=0.5, y=2.8, text="Normal Coupling: NS-CI ≈ 1.0", 
+                          showarrow=False, row=3, col=1)
+        fig.add_annotation(x=0.5, y=0.3, text="Decoupling: NS-CI < 0.5", 
+                          showarrow=False, row=3, col=1)
+        
+        fig.update_layout(
+            title="Real-time NS-Coupling Index Monitoring",
+            height=800,
+            showlegend=True
+        )
+        
+        fig.update_xaxes(title_text="Time (minutes)", row=3, col=1)
+        fig.update_yaxes(title_text="CBF (mL/100g/min)", row=1, col=1)
+        fig.update_yaxes(title_text="PaCO₂ (mmHg)", row=2, col=1)
+        fig.update_yaxes(title_text="NS-CI", row=3, col=1)
+        
+        fig.show()
+        
+        # Print clinical interpretation
+        self.print_clinical_interpretation(ns_ci_values)
+    
+    def print_clinical_interpretation(self, ns_ci_values):
+        """Provide clinical analysis of NS-CI trends"""
+        if not ns_ci_values:
+            print("No valid NS-CI data for interpretation")
+            return
+            
+        recent_ns_ci = ns_ci_values[-30:]  # Last 30 seconds
+        
+        avg_ns_ci = np.mean(recent_ns_ci)
+        std_ns_ci = np.std(recent_ns_ci)
+        
+        print(f"\n=== CLINICAL INTERPRETATION ===")
+        print(f"Current NS-CI: {recent_ns_ci[-1]:.2f}")
+        print(f"30-second average: {avg_ns_ci:.2f} ± {std_ns_ci:.2f}")
+        
+        if 0.5 <= avg_ns_ci <= 1.5:
+            print("🟢 NORMAL COUPLING: CMRO₂-CBF relationship preserved")
+            print("   - Consider maintaining current anesthetic management")
+        elif avg_ns_ci < 0.5:
+            print("🔴 DECOUPLING DETECTED: Possible ischemia/metabolic suppression")
+            print("   - Check: MAP, PaCO₂, anesthetic depth")
+            print("   - Consider: Increasing CPP, optimizing ventilation")
+        else:
+            print("🟠 HYPEREMIA: Possible luxury perfusion")
+            print("   - Check: PaCO₂ levels, vasodilator drugs")
+            print("   - Consider: Mild hyperventilation if appropriate")
+        
+        print(f"Calibrated α₀: {self.alpha_0:.3f}")
+        print(f"Vasopressor effect: {self.vasopressor_effect:.3f}")
+
+class AnesthesiologistCompanionApp:
+    """Main companion app integrating NS-CI analysis"""
+    
+    def __init__(self):
+        self.ns_analyzer = NSCouplingAnalyzer()
+        self.patient_data = {}
+        
+    def initialize_patient(self, patient_id, baseline_params=None):
+        """Initialize new patient monitoring session"""
+        self.patient_data = {
+            'patient_id': patient_id,
+            'start_time': datetime.now(),
+            'monitoring_active': True,
+            'alerts': []
+        }
+        
+        if baseline_params:
+            self.ns_analyzer.cbf_baseline = baseline_params.get('cbf_baseline', 50)
+            self.ns_analyzer.paco2_baseline = baseline_params.get('paco2_baseline', 40)
+        
+        print(f"Patient {patient_id} initialized for NS-CI monitoring")
+    
+    def add_alert(self, alert_type, message, severity="medium"):
+        """Add clinical alert to monitoring system"""
+        alert = {
+            'timestamp': datetime.now(),
+            'type': alert_type,
+            'message': message,
+            'severity': severity
+        }
+        self.patient_data['alerts'].append(alert)
+        print(f"ALERT ({severity.upper()}): {message}")
+    
+    def run_demo(self):
+        """Run complete demonstration"""
+        print("=== Anesthesiologist Companion App ===")
+        print("NS-Coupling Index Monitoring System")
+        print("Developed by: Neuro-Anesthesia Research Team\n")
+        
+        # Initialize patient
+        self.initialize_patient("DEMO_001", {
+            'cbf_baseline': 52,
+            'paco2_baseline': 38
+        })
+        
+        # Run NS-CI simulation
+        ns_ci_results = self.ns_analyzer.run_simulation()
+        
+        # Generate demo alerts based on results
+        if ns_ci_results:
+            recent_ci = ns_ci_results[-10:]
+            avg_ci = np.mean(recent_ci)
+            
+            if avg_ci < 0.5:
+                self.add_alert("decoupling", 
+                              "Persistent CMRO₂-CBF decoupling detected", "high")
+            elif avg_ci > 1.5:
+                self.add_alert("hyperemia", 
+                              "Possible luxury perfusion pattern", "medium")
+        
+        return ns_ci_results
+
+# Main execution
+if __name__ == "__main__":
+    # Create and run the companion app
+    companion_app = AnesthesiologistCompanionApp()
+    results = companion_app.run_demo()
+    
+    # Export results for EHR integration (FHIR format simulation)
+    export_data = {
+        "resourceType": "Observation",
+        "code": {
+            "coding": [{
+                "system": "http://neuroanesthesia.org/codes",
+                "code": "NS-CI",
+                "display": "NS-Coupling Index"
+            }]
+        },
+        "valueQuantity": {
+            "value": float(np.mean(results[-10:])) if results else 0.0,
+            "unit": "dimensionless"
+        },
+        "interpretation": "Normal coupling" if results and 0.5 <= np.mean(results[-10:]) <= 1.5 else "Abnormal coupling"
+    }
+    
+    print(f"\n=== FHIR Export Ready ===")
+    print(json.dumps(export_data, indent=2))
